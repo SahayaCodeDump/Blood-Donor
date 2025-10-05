@@ -1,0 +1,461 @@
+--------------------------------------------------------------------------------------------
+--This script, when run, will create a database for Scenario 2: Blood Donation
+--Created by:
+--Leow Yan Yi [23020324]
+--Lee Jin Fung [23031552]
+--Cheong Cheng Yi Danny [23029127]
+--Leniska Shahaya [22006027]
+--------------------------------------------------------------------------------------------
+
+----------------------------------------
+--Dropping Tables
+----------------------------------------
+
+DROP TABLE Generalblood CASCADE CONSTRAINT;
+DROP TABLE Donormedhistory CASCADE CONSTRAINT;
+DROP TABLE Donorblood CASCADE CONSTRAINT;
+DROP TABLE Donor CASCADE CONSTRAINT;
+DROP TABLE Donationevent CASCADE CONSTRAINT;
+DROP TABLE Bloodtest CASCADE CONSTRAINT;
+DROP TABLE Hospital CASCADE CONSTRAINT;
+DROP TABLE Records CASCADE CONSTRAINT; 
+DROP TABLE Appointment CASCADE CONSTRAINT;
+DROP TABLE Bloodbank CASCADE CONSTRAINT;
+DROP TABLE Receipt CASCADE CONSTRAINT;
+DROP TABLE Recipient CASCADE CONSTRAINT;
+DROP TABLE Recipientblood CASCADE CONSTRAINT;
+DROP TABLE Inventory CASCADE CONSTRAINT;
+
+----------------------------------------
+--Creating Tables
+----------------------------------------
+
+CREATE TABLE Donorblood
+(DonorID NUMBER(3) NOT NULL,
+BloodTypeD CHAR(5),
+ExpirationDate DATE,
+StorageCondition VARCHAR2(15),
+PRIMARY KEY (BloodTypeD, DonorID));
+
+CREATE TABLE Generalblood
+(EventID NUMBER(3) NOT NULL,
+BloodTypeGen CHAR(4),
+BloodTypeD CHAR(5),
+BloodTypeR CHAR(5),
+PRIMARY KEY (EventID, BloodTypeGen, BloodTypeD));
+
+CREATE TABLE Donormedhistory
+(DonorID NUMBER(3) NOT NULL,
+DonorMedHistory VARCHAR2(100),
+PRIMARY KEY (DonorID));
+
+CREATE TABLE Donor
+(DonorID NUMBER(3) NOT NULL,
+DonorName VARCHAR2(100),
+DonorContact NUMBER(12),
+NextOfKinD NUMBER(12),
+BloodTypeGen CHAR(4),
+PRIMARY KEY (DonorID));
+
+CREATE TABLE Donationevent
+(EventID NUMBER(3) NOT NULL,
+DonorID NUMBER(3) NOT NULL,
+AppID NUMBER(3)NOT NULL,
+ExpirationDate DATE,
+EventDate DATE,
+PRIMARY KEY (EventID, DonorID));
+
+CREATE TABLE Bloodtest
+(DonorID NUMBER(3) NOT NULL,
+TestResults VARCHAR2(100),
+TestDate DATE,
+CONSTRAINT TestResultsCheck CHECK (TestResults IN ('Eligible', 'Ineligible')),
+PRIMARY KEY (DonorID));
+
+CREATE TABLE Hospital
+(HospitalID NUMBER(3) NOT NULL,
+HospitalName CLOB,
+HospitalLocation VARCHAR2(100),
+HospitalPhoneLine NUMBER(12),
+BuiltDate DATE,
+PRIMARY KEY (HospitalID));
+
+CREATE TABLE Records
+(RecordID NUMBER(3) NOT NULL,
+BloodTypeD CHAR(5),
+DonorMedHistory VARCHAR2(100),
+BloodTypeGen VARCHAR2(4),
+RecipientID NUMBER(3) NOT NULL,
+CONSTRAINT RecordIdCheck CHECK (RecordID BETWEEN 400 and 421),
+PRIMARY KEY (RecordID));
+
+CREATE TABLE Appointment
+(AppID NUMBER(3) NOT NULL,
+AppDate DATE,
+AppTime INTERVAL DAY TO SECOND, 
+HospitalID NUMBER(3),
+PRIMARY KEY (AppID));
+
+CREATE TABLE Bloodbank
+(BloodBankID NUMBER(3) NOT NULL,
+BloodBankName VARCHAR2(100),
+StorageCap NUMBER(3),
+HospitalID NUMBER(3) NOT NULL,
+PRIMARY KEY (BloodBankID));
+
+CREATE TABLE Receipt
+(ReceiptID NUMBER(3) NOT NULL,
+AppID NUMBER(3) NOT NULL,
+CONSTRAINT ReceiptIDCheck CHECK (ReceiptID BETWEEN 600 and 621),
+PRIMARY KEY (ReceiptID));
+
+CREATE TABLE Recipient
+(RecipientID NUMBER(3) NOT NULL,
+RecipientName VARCHAR2(100),
+NextOfKinR NUMBER(12),
+UrgencyLevel NUMBER(1),
+BloodTypeR CHAR(5),
+CONSTRAINT CheckUrgencyLevel CHECK (UrgencyLevel IN ('1', '2', '3', '4', '5')),
+PRIMARY KEY (RecipientID));
+
+CREATE TABLE Recipientblood
+(BloodTypeR CHAR(5),
+RecipientID NUMBER(3) NOT NULL,
+StorageCondition VARCHAR2(15),
+ExpirationDate DATE,
+CONSTRAINT StorageConditionCheck CHECK (StorageCondition IN ('Well', 'Excellent')),
+PRIMARY KEY (BloodTypeR, RecipientID, ExpirationDate));
+
+CREATE TABLE Inventory
+(HospitalID NUMBER(3) NOT NULL,
+BloodBankID NUMBER(3) NOT NULL,
+Quantity NUMBER(3),
+PRIMARY KEY (HospitalID, BloodBankID));
+
+-----------------------------------------------------------------------------------------------------
+--Creating Indexes
+--We do this so that these two tables can be easily accessed and retrieved when running a command
+-----------------------------------------------------------------------------------------------------
+
+CREATE INDEX DonorProfile
+ on Donor (DonorID, DonorName, DonorContact, BloodtypeGen, NextOfKinD);
+
+ CREATE INDEX RecipientProfile
+ on Recipient (RecipientID, RecipientName, BloodTypeR, NextOfKinR);
+
+--------------------------------------------------------------------------------
+--Creating Views
+--------------------------------------------------------------------------------
+
+CREATE OR REPLACE FORCE EDITIONABLE VIEW "DONORVIEW" ("DONORID", "DONORNAME", "DONORCONTACT", "NEXTOFKIND", "BLOODTYPED", "EVENTDATE", "EXPIRATIONDATE", "HOSPITALNAME", "HOSPITALLOCATION", "HOSPITALPHONELINE") AS 
+  select DONOR.DONORID as DONORID,
+    DONOR.DONORNAME as DONORNAME,
+    DONOR.DONORCONTACT as DONORCONTACT,
+    DONOR.NEXTOFKIND as NEXTOFKIND,
+    DONORBLOOD.BLOODTYPED as BLOODTYPED,
+    DONATIONEVENT.EVENTDATE as EVENTDATE,
+    DONATIONEVENT.EXPIRATIONDATE as EXPIRATIONDATE,
+    HOSPITAL.HOSPITALNAME as HOSPITALNAME,
+    HOSPITAL.HOSPITALLOCATION as HOSPITALLOCATION,
+    HOSPITAL.HOSPITALPHONELINE as HOSPITALPHONELINE 
+ from DONATIONEVENT DONATIONEVENT,
+    APPOINTMENT APPOINTMENT,
+    HOSPITAL HOSPITAL,
+    DONORBLOOD DONORBLOOD,
+    DONOR DONOR 
+ where DONOR.DONORID=DONORBLOOD.DONORID
+    and DONOR.DONORID=DONATIONEVENT.DONORID
+    and APPOINTMENT.APPID=DONATIONEVENT.APPID
+    and HOSPITAL.HOSPITALID=APPOINTMENT.HOSPITALID
+ ORDER BY DonorID;
+
+CREATE OR REPLACE FORCE EDITIONABLE VIEW "RECEPIENTVIEW" ("RECIPIENTID", "RECIPIENTNAME", "NEXTOFKINR", "URGENCYLEVEL", "BLOODTYPER", "EXPIRATIONDATE") AS 
+  select RECIPIENT.RECIPIENTID as RECIPIENTID,
+    RECIPIENT.RECIPIENTNAME as RECIPIENTNAME,
+    RECIPIENT.NEXTOFKINR as NEXTOFKINR,
+    RECIPIENT.URGENCYLEVEL as URGENCYLEVEL,
+    RECIPIENTBLOOD.BLOODTYPER as BLOODTYPER,
+    RECIPIENTBLOOD.EXPIRATIONDATE as EXPIRATIONDATE 
+ from RECIPIENTBLOOD RECIPIENTBLOOD,
+    RECIPIENT RECIPIENT 
+ where RECIPIENT.RECIPIENTID=RECIPIENTBLOOD.RECIPIENTID
+ ORDER BY RecipientID;
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table DonorBlood
+--------------------------------------------------------------------------------
+
+INSERT INTO Donorblood VALUES (101,'A+',TO_DATE('01/09/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (102,'B-',TO_DATE('10/08/2020', 'DD/MM/YYYY'),'Well');
+INSERT INTO Donorblood VALUES (103,'O-',TO_DATE('23/10/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (104,'B-',TO_DATE('30/12/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (105,'A-',TO_DATE('23/10/2020', 'DD/MM/YYYY'),'Well');
+INSERT INTO Donorblood VALUES (106,'O+',TO_DATE('10/08/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (107,'O+',TO_DATE('30/12/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (108,'AB+',TO_DATE('03/02/2021', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (109,'A+',TO_DATE('30/12/2020', 'DD/MM/YYYY'),'Well');
+INSERT INTO Donorblood VALUES (110,'O-',TO_DATE('10/08/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (111,'B+',TO_DATE('19/03/2020', 'DD/MM/YYYY'),'Excellent');
+INSERT INTO Donorblood VALUES (112,'O-',TO_DATE('03/02/2021', 'DD/MM/YYYY'),'Well');
+INSERT INTO Donorblood VALUES (113,'AB-',TO_DATE('23/10/2020', 'DD/MM/YYYY'),'Well');
+INSERT INTO Donorblood VALUES (114,'AB+',TO_DATE('30/12/2020', 'DD/MM/YYYY'),'Well');
+INSERT INTO Donorblood VALUES (115,'A+',TO_DATE('10/08/2020', 'DD/MM/YYYY'),'Excellent');
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table GeneralBlood
+--------------------------------------------------------------------------------
+
+INSERT INTO Generalblood VALUES ('201','A','A+','AB+');
+INSERT INTO Generalblood VALUES ('201','B','B+','B+');
+INSERT INTO Generalblood VALUES ('202','B','B-','B+');
+INSERT INTO Generalblood VALUES ('202','O','O+','O+');
+INSERT INTO Generalblood VALUES ('202','O','O-','O-');
+INSERT INTO Generalblood VALUES ('202','B','B+','B+');
+INSERT INTO Generalblood VALUES ('203','O','O-','A-');
+INSERT INTO Generalblood VALUES ('203','A','A-','A+');
+INSERT INTO Generalblood VALUES ('203','AB','AB-','AB-');
+INSERT INTO Generalblood VALUES ('204','B','B-','B-');
+INSERT INTO Generalblood VALUES ('204','O','O+','A+');
+INSERT INTO Generalblood VALUES ('204','A','A+','A+');
+INSERT INTO Generalblood VALUES ('204','AB','AB+','AB+');
+INSERT INTO Generalblood VALUES ('205','AB','AB+','AB+');
+INSERT INTO Generalblood VALUES ('205','O','O-','O-');
+INSERT INTO Generalblood VALUES ('206','B','B-','A-');
+INSERT INTO Generalblood VALUES ('206','O','O+','O+');
+INSERT INTO Generalblood VALUES ('207','B','B-','AB+');
+INSERT INTO Generalblood VALUES ('208','O','O-','O-');
+INSERT INTO Generalblood VALUES ('209','AB','AB-','AB+');
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table DonorMedHistory
+--------------------------------------------------------------------------------
+
+INSERT INTO Donormedhistory VALUES (101,'None');
+INSERT INTO Donormedhistory VALUES (102,'None');
+INSERT INTO Donormedhistory VALUES (103,'Type 1 Diabetes');
+INSERT INTO Donormedhistory VALUES (104,'None');
+INSERT INTO Donormedhistory VALUES (105,'Common Cold');
+INSERT INTO Donormedhistory VALUES (106,'None');
+INSERT INTO Donormedhistory VALUES (107,'None');
+INSERT INTO Donormedhistory VALUES (108,'Asthma');
+INSERT INTO Donormedhistory VALUES (109,'None');
+INSERT INTO Donormedhistory VALUES (110,'None');
+INSERT INTO Donormedhistory VALUES (111,'Birth Control');
+INSERT INTO Donormedhistory VALUES (112,'None');
+INSERT INTO Donormedhistory VALUES (113,'None');
+INSERT INTO Donormedhistory VALUES (114,'None');
+INSERT INTO Donormedhistory VALUES (115,'None');
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Donor
+--------------------------------------------------------------------------------
+
+INSERT INTO Donor VALUES (101, 'Harper Sinclair', 60123456789, 60153266523, 'A');
+INSERT INTO Donor VALUES (102, 'Jackson Steele', 60175217825, 60185521119, 'B');
+INSERT INTO Donor VALUES (103, 'Isabella Cruz', 60117521485, 60193345126, 'O');
+INSERT INTO Donor VALUES (104, 'Ethan Montgomery', 60178522784, 60128284491, 'B');
+INSERT INTO Donor VALUES (105, 'Olivia Bennett', 60148227485, 60146024473, 'A');
+INSERT INTO Donor VALUES (106, 'Liam Donovan', 60178897555, 60158893461, 'O');
+INSERT INTO Donor VALUES (107, 'Sophia Ramirez', 60178224756, 60135971258, 'O');
+INSERT INTO Donor VALUES (108, 'Caleb Anderson', 60148875621, 60105596312, 'AB');
+INSERT INTO Donor VALUES (109, 'Ava Sullivan', 60175483605, 60122587413, 'A');
+INSERT INTO Donor VALUES (110, 'Lucas Parker', 60121228063, 60166578482, 'O');
+INSERT INTO Donor VALUES (111, 'Mia Fitzgerald', 60167856200, 60100022649, 'B');
+INSERT INTO Donor VALUES (112, 'Noah Campbell', 60169281377, 60174826319, 'O');
+INSERT INTO Donor VALUES (113, 'Emily Sanchez', 60103427768, 60198549726, 'AB');
+INSERT INTO Donor VALUES (114, 'Aiden Phillips', 60148381595, 60189452365, 'AB');
+INSERT INTO Donor VALUES (115, 'Emma Torres', 60173211148, 60148526194, 'B');
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table DonationEvent
+--------------------------------------------------------------------------------
+
+INSERT INTO DonationEvent VALUES (201, 101, 301, TO_DATE('1/9/2020', 'DD/MM/YYYY'), TO_DATE('12/2/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (202, 102, 302, TO_DATE('10/8/2020', 'DD/MM/YYYY'), TO_DATE('6/7/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (203, 103, 303, TO_DATE('23/10/2020', 'DD/MM/YYYY'), TO_DATE('18/9/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (204, 104, 304, TO_DATE('30/12/2020', 'DD/MM/YYYY'), TO_DATE('25/11/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (203, 105, 305, TO_DATE('23/10/2020', 'DD/MM/YYYY'), TO_DATE('18/9/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (202, 106, 306, TO_DATE('10/8/2020', 'DD/MM/YYYY'), TO_DATE('6/7/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (204, 107, 307, TO_DATE('30/12/2020', 'DD/MM/YYYY'), TO_DATE('25/11/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (205, 108, 308, TO_DATE('3/2/2021', 'DD/MM/YYYY'), TO_DATE('30/12/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (204, 109, 309, TO_DATE('30/12/2020', 'DD/MM/YYYY'), TO_DATE('25/11/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (202, 110, 310, TO_DATE('10/8/2020', 'DD/MM/YYYY'), TO_DATE('6/7/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (201, 111, 311, TO_DATE('19/3/2020', 'DD/MM/YYYY'), TO_DATE('12/2/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (205, 112, 312, TO_DATE('3/2/2021', 'DD/MM/YYYY'), TO_DATE('30/12/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (203, 113, 313, TO_DATE('23/10/2020', 'DD/MM/YYYY'), TO_DATE('18/9/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (204, 114, 314, TO_DATE('30/12/2020', 'DD/MM/YYYY'), TO_DATE('25/11/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (202, 115, 315, TO_DATE('10/8/2020', 'DD/MM/YYYY'), TO_DATE('6/7/2020', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (206, 102, 316, TO_DATE('16/6/2022', 'DD/MM/YYYY'), TO_DATE('12/5/2022', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (207, 104, 317, TO_DATE('21/4/2022', 'DD/MM/YYYY'), TO_DATE('17/3/2022', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (206, 107, 318, TO_DATE('25/8/2022', 'DD/MM/YYYY'), TO_DATE('21/7/2022', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (208, 110, 319, TO_DATE('26/10/2022', 'DD/MM/YYYY'), TO_DATE('	21/9/2022', 'DD/MM/YYYY'));
+INSERT INTO DonationEvent VALUES (209, 113, 320, TO_DATE('8/6/2022', 'DD/MM/YYYY'), TO_DATE('4/5/2022', 'DD/MM/YYYY'));
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table BloodTest
+--------------------------------------------------------------------------------
+
+INSERT INTO BloodTest VALUES (101, 'Eligible', TO_DATE('8/2/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (102, 'Eligible', TO_DATE('5/7/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (103, 'Eligible', TO_DATE('10/9/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (104, 'Eligible', TO_DATE('17/11/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (105, 'Eligible', TO_DATE('14/9/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (106, 'Eligible', TO_DATE('2/7/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (107, 'Eligible', TO_DATE('17/11/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (108, 'Eligible', TO_DATE('20/12/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (109, 'Eligible', TO_DATE('18/11/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (110, 'Eligible', TO_DATE('3/7/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (111, 'Eligible', TO_DATE('9/2/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (112, 'Eligible', TO_DATE('21/12/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (113, 'Eligible', TO_DATE('13/9/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (114, 'Eligible', TO_DATE('19/11/2020', 'DD/MM/YYYY'));
+INSERT INTO BloodTest VALUES (115, 'Eligible', TO_DATE('1/7/2020', 'DD/MM/YYYY'));
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Hospital
+--------------------------------------------------------------------------------
+
+INSERT INTO Hospital VALUES (701, 'Cherry Blossom Medical Center', 'Jalan Ampang', '60376969584', TO_DATE('11/12/2000', 'DD/MM/YYYY'));
+INSERT INTO Hospital VALUES (702, 'Sunway Medical Center', 'Subang Jaya', '60394948824', TO_DATE('12/11/1999', 'DD/MM/YYYY'));
+INSERT INTO Hospital VALUES (703, 'Peak View General Hospital', 'Shah Alam', '60378837317', TO_DATE('10/3/1994', 'DD/MM/YYYY'));
+INSERT INTO Hospital VALUES (704, 'Harmony General Hospital', 'Kinrara', '60390304583', TO_DATE('5/11/1971', 'DD/MM/YYYY'));
+INSERT INTO Hospital VALUES (705, 'Great River Community Hospital', 'Sepang', '60380082047', TO_DATE('21/05/1987', 'DD/MM/YYYY'));
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Records
+--------------------------------------------------------------------------------
+
+INSERT INTO Records VALUES (401,'A+','None','A',501);
+INSERT INTO Records VALUES (402,'B-','None','B',502);
+INSERT INTO Records VALUES (403,'O-','Type 1 Diabetes','O',503);
+INSERT INTO Records VALUES (404,'B-','None','B',504);
+INSERT INTO Records VALUES (405,'A-','Common Cold','A',505);
+INSERT INTO Records VALUES (406,'O+','None','O',506);
+INSERT INTO Records VALUES (407,'O+','None','O',507);
+INSERT INTO Records VALUES (408,'AB+','Asthma','AB',508);
+INSERT INTO Records VALUES (409,'A+','None','A',509);
+INSERT INTO Records VALUES (410,'O-','None','O',510);
+INSERT INTO Records VALUES (411,'B+','Birth Control','B',511);
+INSERT INTO Records VALUES (412,'O-','None','O',512);
+INSERT INTO Records VALUES (413,'AB-','None','AB',513);
+INSERT INTO Records VALUES (414,'AB+','None','AB',514);
+INSERT INTO Records VALUES (415,'B+','None','B',515);
+INSERT INTO Records VALUES (416,'B-','None','B',503);
+INSERT INTO Records VALUES (417,'B-','None','B',508);
+INSERT INTO Records VALUES (418,'O+','None','O',506);
+INSERT INTO Records VALUES (419,'O-','None','O',512);
+INSERT INTO Records VALUES (420,'AB-','None','AB',501);
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Appointment
+--------------------------------------------------------------------------------
+
+INSERT INTO Appointment VALUES (301,TO_DATE('12/2/2020','DD/MM/YYYY'),INTERVAL '0 12:00:00' DAY TO SECOND,701);
+INSERT INTO Appointment VALUES (302,TO_DATE('6/7/2020','DD/MM/YYYY'),INTERVAL '0 16:00:00' DAY TO SECOND,702);
+INSERT INTO Appointment VALUES (303,TO_DATE('18/9/2020','DD/MM/YYYY'),INTERVAL '0 09:00:00' DAY TO SECOND,703);
+INSERT INTO Appointment VALUES (304,TO_DATE('25/11/2020','DD/MM/YYYY'),INTERVAL '0 10:00:00' DAY TO SECOND,704);
+INSERT INTO Appointment VALUES (305,TO_DATE('18/9/2020','DD/MM/YYYY'),INTERVAL '0 14:00:00' DAY TO SECOND,703);
+INSERT INTO Appointment VALUES (306,TO_DATE('6/7/2020','DD/MM/YYYY'),INTERVAL '0 12:00:00' DAY TO SECOND,702);
+INSERT INTO Appointment VALUES (307,TO_DATE('25/11/2020','DD/MM/YYYY'),INTERVAL '0 13:00:00' DAY TO SECOND,704);
+INSERT INTO Appointment VALUES (308,TO_DATE('30/12/2020','DD/MM/YYYY'),INTERVAL '0 11:00:00' DAY TO SECOND,705);
+INSERT INTO Appointment VALUES (309,TO_DATE('25/11/2020','DD/MM/YYYY'),INTERVAL '0 15:00:00' DAY TO SECOND,704);
+INSERT INTO Appointment VALUES (310,TO_DATE('6/7/2020','DD/MM/YYYY'),INTERVAL '0 09:00:00' DAY TO SECOND,702);
+INSERT INTO Appointment VALUES (311,TO_DATE('12/2/2020','DD/MM/YYYY'),INTERVAL '0 12:00:00' DAY TO SECOND,701);
+INSERT INTO Appointment VALUES (312,TO_DATE('30/12/2020','DD/MM/YYYY'),INTERVAL '0 11:00:00' DAY TO SECOND,705);
+INSERT INTO Appointment VALUES (313,TO_DATE('18/9/2020','DD/MM/YYYY'),INTERVAL '0 14:00:00' DAY TO SECOND,703);
+INSERT INTO Appointment VALUES (314,TO_DATE('25/11/2020','DD/MM/YYYY'),INTERVAL '0 11:00:00' DAY TO SECOND,704);
+INSERT INTO Appointment VALUES (315,TO_DATE('6/7/2020','DD/MM/YYYY'),INTERVAL '0 12:00:00' DAY TO SECOND,702);
+INSERT INTO Appointment VALUES (316,TO_DATE('12/5/2022','DD/MM/YYYY'),INTERVAL '0 09:00:00' DAY TO SECOND,702);
+INSERT INTO Appointment VALUES (317,TO_DATE('17/3/2022','DD/MM/YYYY'),INTERVAL '0 10:00:00' DAY TO SECOND,704);
+INSERT INTO Appointment VALUES (318,TO_DATE('21/7/2022','DD/MM/YYYY'),INTERVAL '0 12:00:00' DAY TO SECOND,704);
+INSERT INTO Appointment VALUES (319,TO_DATE('21/9/2022','DD/MM/YYYY'),INTERVAL '0 15:00:00' DAY TO SECOND,702);
+INSERT INTO Appointment VALUES (320,TO_DATE('4/5/2022','DD/MM/YYYY'),INTERVAL '0 14:00:00' DAY TO SECOND,703);
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table BloodBank
+--------------------------------------------------------------------------------
+
+INSERT INTO Bloodbank VALUES (801,'Caring Mist Blood Bank',280,701);
+INSERT INTO Bloodbank VALUES (802,'Star Globe Blood Repository',240,702);
+INSERT INTO Bloodbank VALUES (803,'Red Cross Blood Depot',160,703);
+INSERT INTO Bloodbank VALUES (804,'Hapse Blood Bank',290,704);
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Receipt
+--------------------------------------------------------------------------------
+
+INSERT INTO Receipt VALUES (601,301);
+INSERT INTO Receipt VALUES (602,302);
+INSERT INTO Receipt VALUES (603,303);
+INSERT INTO Receipt VALUES (604,304);
+INSERT INTO Receipt VALUES (605,305);
+INSERT INTO Receipt VALUES (606,306);
+INSERT INTO Receipt VALUES (607,307);
+INSERT INTO Receipt VALUES (608,308);
+INSERT INTO Receipt VALUES (609,309);
+INSERT INTO Receipt VALUES (610,310);
+INSERT INTO Receipt VALUES (611,311);
+INSERT INTO Receipt VALUES (612,312);
+INSERT INTO Receipt VALUES (613,313);
+INSERT INTO Receipt VALUES (614,314);
+INSERT INTO Receipt VALUES (615,315);
+INSERT INTO Receipt VALUES (616,316);
+INSERT INTO Receipt VALUES (617,317);
+INSERT INTO Receipt VALUES (618,318);
+INSERT INTO Receipt VALUES (619,319);
+INSERT INTO Receipt VALUES (620,320);
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Recipient
+--------------------------------------------------------------------------------
+
+INSERT INTO Recipient VALUES (501,'Ethan Walker',6014587827,1,'AB+');
+INSERT INTO Recipient VALUES (502,'Isabella Turner',6017862485,3,'B+');
+INSERT INTO Recipient VALUES (503,'Caleb Morgan',6017862245,4,'A-');
+INSERT INTO Recipient VALUES (504,'Sophia Brooks',6014862386,2,'B-');
+INSERT INTO Recipient VALUES (505,'Lucas Bennett',6017882247,5,'A+');
+INSERT INTO Recipient VALUES (506,'Ava Foster',6018378633,1,'O+');
+INSERT INTO Recipient VALUES (507,'Noah Mitchell',6017486324,4,'A+');
+INSERT INTO Recipient VALUES (508,'Mia Campbell',6014862327,3,'AB+');
+INSERT INTO Recipient VALUES (509,'Alexander Reed',6014863227,2,'A+');
+INSERT INTO Recipient VALUES (510,'Olivia Peterson',6017879224,5,'O-');
+INSERT INTO Recipient VALUES (511,'Benjamin Hughes',6017862044,1,'B+');
+INSERT INTO Recipient VALUES (512,'Emma Cooper',6017823245,3,'O-');
+INSERT INTO Recipient VALUES (513,'Daniel Sanchez',6017852486,2,'AB-');
+INSERT INTO Recipient VALUES (514,'Amelia Ross',6017822456,4,'AB+');
+INSERT INTO Recipient VALUES (515,'William Jenkins',6017823247,5,'B+');
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table RecipientBlood
+--------------------------------------------------------------------------------
+
+INSERT INTO Recipientblood VALUES ('AB+',501,'Excellent',TO_DATE('1/9/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('B+',502,'Well',TO_DATE('10/8/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('A-',503,'Excellent',TO_DATE('23/10/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('B-',504,'Excellent',TO_DATE('30/12/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('A+',505,'Well',TO_DATE('23/10/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('O+',506,'Excellent',TO_DATE('10/8/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('A+',507,'Excellent',TO_DATE('30/12/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('AB+',508,'Excellent',TO_DATE('3/2/2021','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('A+',509,'Well',TO_DATE('30/12/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('O-',510,'Excellent',TO_DATE('10/8/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('B+',511,'Excellent',TO_DATE('19/3/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('O-',512,'Well',TO_DATE('3/2/2021','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('AB-',513,'Well',TO_DATE('23/10/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('AB+',514,'Well',TO_DATE('30/12/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('B+',515,'Excellent',TO_DATE('10/8/2020','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('A-',503,'Well',TO_DATE('16/6/2022','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('AB+',508,'Excellent',TO_DATE('21/4/2022','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('O+',506,'Excellent',TO_DATE('25/8/2022','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('O-',512,'Well',TO_DATE('26/10/2022','DD/MM/YYYY'));
+INSERT INTO Recipientblood VALUES ('AB+',501,'Well',TO_DATE('8/6/2022','DD/MM/YYYY'));
+
+--------------------------------------------------------------------------------
+--Inserting Values into Table Inventory
+--------------------------------------------------------------------------------
+
+INSERT INTO Inventory VALUES (701,801,190);
+INSERT INTO Inventory VALUES (702,802,208);
+INSERT INTO Inventory VALUES (703,803,128);
+INSERT INTO Inventory VALUES (704,804,189);
+INSERT INTO Inventory VALUES (705,801,190);
